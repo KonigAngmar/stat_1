@@ -1,131 +1,136 @@
-import numpy as np
-from scipy import stats
+import numpy as np                         # Імпортуємо NumPy для роботи з масивами та генерації випадкових чисел.
+from scipy.integrate import quad           # Імпортуємо quad для чисельного інтегрування (обчислення "точного" значення Q(α)).
+import math                                # Імпортуємо math для математичних операцій (хоча в цьому коді не використовується).
 
-"""
-Завдання 2: Обчислення ймовірності Q(α) = P{ξₐ < η} чотирма методами
+# Фіксуємо генератор випадкових чисел для відтворюваності результатів.
+np.random.seed(42)                         # Це забезпечує однакові результати при повторних запусках (важливо для досліджень).
 
-Для в.в. ξₐ та η маємо:
-  ξₐ = Fₐ⁻¹(ω) = ( -ln ω )^(1/4) / α,  
-  η   = G⁻¹(ω) = ( -ln ω )^(1/2),
-де ω – рівномірна на [0,1].
+# Задаємо параметри для побудови довірчого інтервалу та контролю похибки.
+z_gamma = 2.575          # Коефіцієнт для 99%-го довірчого інтервалу, який взято з таблиць нормального розподілу.
+epsilon = 0.01           # Задана відносна похибка (1%), яка визначає критерій зупинки симуляції.
+n0 = 100                 # Початкова кількість симуляцій (realizacij) - стартовий розмір вибірки.
+batch_size_default = 10  # Базовий розмір партії нових симуляцій, що додаються при кожному оновленні статистик.
+max_iter = 10            # Максимальна кількість ітерацій для накопичення ненульових спостережень (якщо результат рівний нулю).
+max_total = int(1e9)     # Максимальна кількість симуляцій, щоб уникнути нескінченних циклів при рідкісних подіях.
 
-Метод 1: q̂ᵢ = I(ξₐ^(i) < ηᵢ)
-Метод 2: q̂ᵢ = 1 - G(ξₐ^(i)) = exp( - [ξₐ^(i)]² )
-Метод 3: q̂ᵢ = Fₐ(ηᵢ) = 1 - exp( - (αηᵢ)⁴ )
-Метод 4: q̂ᵢ = 2/(βᵢ⁴) · [1 - exp( - (αβᵢ)⁴ )],
-де βᵢ = √(θ₁ + θ₂ + θ₃) з θⱼ = -ln(ωⱼ), для ω₍₃ᵢ₋₂₎, ω₍₃ᵢ₋₁₎, ω₍₃ᵢ₎.
+# Функція обчислення "точного" значення Q(α) чисельним інтегруванням
+def exact_Q(alpha):
+    # Функція інтегранду: (1 - exp[-(αu)^4]) * 2u * exp(-u^2)
+    integrand = lambda u: (1 - np.exp(-(alpha*u)**4)) * 2*u*np.exp(-u**2)
+    val, err = quad(integrand, 0, np.inf)  # Інтегруємо від 0 до нескінченності за допомогою quad.
+    return val                             # Повертаємо значення інтегралу як "точне" Q(α).
 
-Нижче реалізовано усі методи.
-"""
+# Метод 1: Стандартний Монте-Карло (інверсійне перетворення)
+def method1(alpha, n):
+    u1 = np.random.rand(n)                 # Генеруємо n випадкових чисел для першої послідовності (U[0,1]).
+    u2 = np.random.rand(n)                 # Генеруємо n випадкових чисел для другої послідовності (U[0,1]).
+    # Обчислюємо ξₐ за формулою: (-ln(u1))^(1/4) / α
+    xi = (-np.log(u1))**0.25 / alpha
+    # Обчислюємо η за формулою: (-ln(u2))^(1/2)
+    eta = (-np.log(u2))**0.5
+    return (xi < eta).astype(float)        # Повертаємо індикаторну функцію: 1, якщо ξₐ < η, інакше 0.
 
-def method1(alpha, M):
-    # Генеруємо ξₐ та η за відповідними оберненими функціями
-    # Для ξₐ: ξₐ = (-ln ω)^(1/4) / α, для η: η = (-ln ω)^(1/2)
-    omega = np.random.rand(M)
-    xi = ((-np.log(omega)) ** 0.25) / alpha
-    eta = (-np.log(omega)) ** 0.5
-    return (xi < eta).astype(float)
+# Метод 2: Оцінка через вираз 1 - G(ξₐ), де G(ξₐ) = 1 - exp(-ξₐ²)
+def method2(alpha, n):
+    u = np.random.rand(n)                  # Генеруємо n випадкових чисел.
+    xi = (-np.log(u))**0.25 / alpha         # Обчислюємо ξₐ за тією ж формулою, що й у методі 1.
+    return np.exp(-xi**2)                  # Повертаємо exp(-ξₐ²), що дорівнює 1 - G(ξₐ).
 
-def method2(alpha, M):
-    # Використовуємо: q̂ᵢ = exp( - [ξₐ^(i)]² ), де ξₐ = (-ln ω)^(1/4) / α
-    omega = np.random.rand(M)
-    xi = ((-np.log(omega)) ** 0.25) / alpha
-    return np.exp( - xi**2 )
+# Метод 3: Оцінка через функцію розподілу Fₐ(η) = 1 - exp[-(αη)^4]
+def method3(alpha, n):
+    u = np.random.rand(n)                  # Генеруємо n випадкових чисел.
+    eta = (-np.log(u))**0.5                 # Обчислюємо η за формулою: (-ln(u))^(1/2).
+    return 1 - np.exp(-(alpha*eta)**4)       # Повертаємо Fₐ(η).
 
-def method3(alpha, M):
-    # Використовуємо: q̂ᵢ = 1 - exp( - (αηᵢ)⁴ ), де η = (-ln ω)^(1/2)
-    omega = np.random.rand(M)
-    eta = (-np.log(omega)) ** 0.5
-    return 1 - np.exp( - (alpha * eta)**4 )
+# Метод 4: Importance Sampling для зменшення дисперсії
+def method4(alpha, n):
+    u = np.random.rand(n, 3)               # Генеруємо матрицю розміром n x 3 для трьох незалежних випадкових чисел.
+    theta = -np.log(u)                     # Перетворюємо їх у експоненційно розподілені величини (з параметром 1).
+    beta = np.sqrt(np.sum(theta, axis=1))    # Обчислюємо β = sqrt(θ₁ + θ₂ + θ₃) для кожного набору.
+    return 2.0 / (beta**4) * (1 - np.exp(-(alpha*beta)**4))  
+    # Повертаємо оцінку q, яка базується на зміненій щільності (importance sampling).
 
-def method4(alpha, M):
-    # Для кожного запуску генеруємо 3 незалежних рівномірних в.в.
-    # Обчислюємо θ = -ln(ω) для кожного та β = sqrt(θ₁+θ₂+θ₃)
-    # Потім q̂ᵢ = 2/(β⁴)*[1 - exp( - (αβ)⁴)]
-    omega = np.random.rand(M, 3)
-    theta = -np.log(omega)
-    beta_val = np.sqrt(np.sum(theta, axis=1))
-    return (2.0 / (beta_val ** 4)) * (1 - np.exp( - (alpha * beta_val) ** 4))
-
-def simulate_method(method_func, alpha, pilot_M=1000, epsilon=0.01, confidence=0.99, max_iter=1e7):
-    z_quant = stats.norm.ppf(1 - (1 - confidence) / 2)
-    
-    M = int(pilot_M)
-    pilot_est = method_func(alpha, M)
-    pilot_sum = np.sum(pilot_est)
-    pilot_sum_sq = np.sum(pilot_est ** 2)
-    
-    Q_hat = pilot_sum / M
-    var_hat = (pilot_sum_sq - M * Q_hat ** 2) / (M - 1) if M > 1 else 0.0
-
-    if Q_hat == 0:
-        return {
-            'M_used': M,
-            'Q_est': 0.0,
-            'variance': 0.0,
-            'ci': (0.0, 0.0),
-            'ci_width': 0.0
-        }
-    
-    N_required = int(np.ceil(M * (z_quant**2 * var_hat) / ((epsilon * Q_hat) ** 2)))
-    if N_required > max_iter:
-        N_required = int(max_iter)
-        print(f"Warning: N_required capped at max_iter = {max_iter}")
-
-    if N_required > M:
-        extra_M = N_required - M
-        extra_est = method_func(alpha, extra_M)
-        total_sum = pilot_sum + np.sum(extra_est)
-        total_sum_sq = pilot_sum_sq + np.sum(extra_est ** 2)
-        N = N_required
-        Q_final = total_sum / N
-        var_final = (total_sum_sq - N * Q_final ** 2) / (N - 1) if N > 1 else 0.0
+# Функція симуляції з онлайн-оновленням статистик (без зберігання всіх значень q)
+def simulate_method_online(method_func, alpha, n0, z, epsilon, batch_size_default, max_iter, max_total):
+    # Для рідкісних подій (α < 0.2) збільшуємо розмір партії для швидшого накопичення ненульових значень.
+    if alpha < 0.2:
+        batch_size = 1000             # Якщо α дуже мале, використовуємо batch_size = 1000.
     else:
-        N = M
-        Q_final = Q_hat
-        var_final = var_hat
+        batch_size = batch_size_default  # Інакше - стандартний розмір партії.
 
-    margin = z_quant * np.sqrt(var_final / N)
-    ci = (Q_final - margin, Q_final + margin)
+    # Початковий блок симуляцій
+    q_batch = method_func(alpha, n0)      # Отримуємо першу партію q-значень.
+    n = n0                                # Встановлюємо початкову кількість симуляцій.
+    s = np.sum(q_batch)                   # Обчислюємо суму q_i.
+    s2 = np.sum(q_batch**2)                # Обчислюємо суму квадратів q_i.
+    mean = s / n                          # Обчислюємо середнє значення q.
+    variance = (s2 - n * mean**2) / (n - 1) if n > 1 else 0.0  # Обчислюємо дисперсію.
+    iter_count = 0                        # Ініціалізуємо лічильник ітерацій.
 
-    return {
-        'M_used': N,
-        'Q_est': Q_final,
-        'variance': var_final,
-        'ci': ci,
-        'ci_width': ci[1] - ci[0]
-    }
+    # Якщо середнє значення дорівнює нулю (що може траплятися для рідкісних подій), накопичуємо нові партії
+    while mean == 0 and iter_count < max_iter and n < max_total:
+        q_batch = method_func(alpha, batch_size)   # Генеруємо нову партію.
+        s += np.sum(q_batch)                       # Оновлюємо суму.
+        s2 += np.sum(q_batch**2)                     # Оновлюємо суму квадратів.
+        n += batch_size                            # Збільшуємо загальну кількість симуляцій.
+        mean = s / n                               # Оновлюємо середнє.
+        variance = (s2 - n * mean**2) / (n - 1) if n > 1 else 0.0  # Оновлюємо дисперсію.
+        iter_count += 1                            # Збільшуємо лічильник ітерацій.
 
-def task2_simulation(alphas, pilot_M=1000, epsilon=0.01, confidence=0.99, max_iter=1e7):
-    methods = {
-        'Метод 1': method1,
-        'Метод 2': method2,
-        'Метод 3': method3,
-        'Метод 4': method4
+    if mean == 0:
+        # Якщо після max_iter значень середнє все ще нульове, повідомляємо про це.
+        print("  Метод не дав ненульових спостережень після максимуму ітерацій.")
+        return mean, variance, (0, 0), n
+
+    # Основний цикл накопичення, який триває, поки не буде досягнуто критерію точності:
+    # n >= (z^2 * variance) / (epsilon^2 * mean^2)
+    while n < (z**2 * variance) / (epsilon**2 * mean**2) and n < max_total:
+        q_batch = method_func(alpha, batch_size)  # Отримуємо наступну партію симуляцій.
+        s += np.sum(q_batch)                      # Оновлюємо суму.
+        s2 += np.sum(q_batch**2)                    # Оновлюємо суму квадратів.
+        n += batch_size                           # Оновлюємо загальну кількість симуляцій.
+        mean = s / n                              # Оновлюємо середнє.
+        variance = (s2 - n * mean**2) / (n - 1) if n > 1 else 0.0  # Оновлюємо дисперсію.
+
+    if n >= max_total:
+        # Якщо досягнуто максимальну кількість симуляцій, виводимо повідомлення.
+        print("  Досягнуто максимальну кількість реалізацій, критерій не досягнуто.")
+
+    # Обчислюємо 99%-й довірчий інтервал:
+    ci_lower = mean - z * np.sqrt(variance) / np.sqrt(n)
+    ci_upper = mean + z * np.sqrt(variance) / np.sqrt(n)
+    return mean, variance, (ci_lower, ci_upper), n  # Повертаємо оцінку, дисперсію, інтервал та кількість симуляцій.
+
+# Основна функція для групування результатів за методами
+def task2_main():
+    alphas = [1, 0.3, 0.1]                     # Значення параметра α, для яких проводимо симуляцію.
+    methods = {                                # Словник, що містить назви методів та відповідні функції.
+        "Метод 1 (індикатор)": method1,
+        "Метод 2 (1-G(ξₐ))": method2,
+        "Метод 3 (Fₐ(η))": method3,
+        "Метод 4 (Importance Sampling)": method4
     }
     
-    results = {}
-    for alpha in alphas:
-        alpha_res = {}
-        true_Q = alpha / (alpha + 1)  # аналітичне значення Q(α)
-        for method_name, method_func in methods.items():
-            res = simulate_method(method_func, alpha, pilot_M, epsilon, confidence, max_iter)
-            res['true_Q'] = true_Q
-            res['error'] = abs(res['Q_est'] - true_Q)
-            alpha_res[method_name] = res
-        results[alpha] = alpha_res
-    return results
-
-def task2_main():
-    alphas = [1, 0.3, 0.1]
-    results = task2_simulation(alphas, pilot_M=1000, epsilon=0.01, confidence=0.99, max_iter=1e7)
-    for alpha in alphas:
-        print(f"\nЗавдання 2. Параметр α = {alpha}, аналітичне Q(α) = {alpha/(alpha+1):.5f}")
-        for method_name, res in results[alpha].items():
-            print(f"{method_name}:")
-            print(f"  Кількість симуляцій: {res['M_used']}")
-            print(f"  Оцінка Q(α): {res['Q_est']:.5f}")
-            print(f"  Вибіркова дисперсія: {res['variance']:.5e}")
-            print(f"  Довірчий інтервал: ({res['ci'][0]:.5f}, {res['ci'][1]:.5f})")
-            print(f"  Ширина CI: {res['ci_width']:.5f}")
-            print(f"  Абсолютна похибка: {res['error']:.5e}")
+    # Проходимо по кожному методу
+    for method_name, func in methods.items():
+        print("="*80)
+        print(f"{method_name}:")
+        # Для кожного значення α виводимо результати симуляції
+        for alpha in alphas:
+            print("-"*40)
+            print(f"Параметр α = {alpha}")
+            Q_exact = exact_Q(alpha)            # Обчислюємо "точне" значення Q(α) за допомогою чисельного інтегрування.
+            print(f"Точне значення Q(α) = {Q_exact:.8f}")
+            # Викликаємо функцію симуляції та отримуємо оцінку, дисперсію, довірчий інтервал і кількість симуляцій.
+            mean, variance, (ci_lower, ci_upper), n_used = simulate_method_online(
+                func, alpha, n0, z_gamma, epsilon, batch_size_default, max_iter, max_total
+            )
+            if mean == 0:
+                # Якщо отримано лише нульові спостереження, виводимо повідомлення.
+                print("  Отримано лише нульові спостереження, неможливо побудувати довірчий інтервал.")
+            else:
+                print(f"  Отримана оцінка Q̂(α) = {mean:.8f}")
+                print(f"  Вибіркова дисперсія = {variance:.8e}")
+                print(f"  Довірчий інтервал (99%) = [{ci_lower:.8f} ; {ci_upper:.8f}]")
+            print(f"  Кількість реалізацій = {n_used}")
+        print("="*80, "\n")
