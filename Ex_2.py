@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 from Funcs import generate_sample, chi_square_test
 
 
@@ -24,3 +25,11 @@ def task2():
             )
     print("-" * 50)
     print("\n")
+
+
+def chi_square_test(sample, k, lambd):
+    transformed_sample = 1 - np.exp(-lambd * sample)  # Перетворення для рівномірності
+    observed, _ = np.histogram(transformed_sample, bins=k, range=(0, 1))
+    expected = np.full(k, len(sample) / k)  # Очікувані значення
+    chi2_statistic, p_value = stats.chisquare(observed, expected)
+    return chi2_statistic, p_value

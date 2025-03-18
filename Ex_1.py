@@ -1,3 +1,5 @@
+import numpy as np
+from scipy import stats
 from Funcs import generate_sample, kolmogorov_test
 
 
@@ -20,3 +22,9 @@ def task1():
             )
     print("-" * 50)
     print("\n")
+
+
+def kolmogorov_test(sample, lambd):
+    transformed_sample = 1 - np.exp(-lambd * sample)
+    d_statistic, p_value = stats.kstest(transformed_sample, "uniform")
+    return d_statistic, p_value
