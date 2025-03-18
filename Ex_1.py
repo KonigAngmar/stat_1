@@ -1,4 +1,4 @@
-from Ex1_2 import generate_sample, kolmogorov_test
+from Funcs import generate_sample, kolmogorov_test
 
 def task1():
     sizes = [1000, 10000, 100000]

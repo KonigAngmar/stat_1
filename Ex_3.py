@@ -1,5 +1,5 @@
 import numpy as np
-from Ex1_2 import generate_sample
+from Funcs import generate_sample
 from scipy.stats import chi2
 
 

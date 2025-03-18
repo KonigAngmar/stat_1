@@ -1,4 +1,4 @@
-from Ex1_2 import generate_sample
+from Funcs import generate_sample
 import numpy as np
 from scipy.stats import ks_2samp
 

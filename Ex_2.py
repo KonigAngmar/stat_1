@@ -1,5 +1,5 @@
 import numpy as np
-from Ex1_2 import generate_sample, chi_square_test
+from Funcs import generate_sample, chi_square_test
 
 
 def task2():
