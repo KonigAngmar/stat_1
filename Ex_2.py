@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats
-from Funcs import generate_sample, chi_square_test
+from Funcs import generate_sample
 
 
 def task2():

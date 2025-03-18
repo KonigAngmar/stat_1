@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats
-from Funcs import generate_sample, kolmogorov_test
+from Funcs import generate_sample
 
 
 def task1():
