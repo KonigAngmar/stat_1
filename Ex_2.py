@@ -9,6 +9,8 @@ def task2():
     k_values = [int(np.ceil(30 * size / 1000)) for size in sizes]  # Обираємо k
 
     for size, k in zip(sizes, k_values):
+        print("-" * 50)
+
         for lambd in lambdas:
             sample = generate_sample(size, lambd)
 
@@ -20,4 +22,5 @@ def task2():
             print(
                 "Hypothesis rejected" if p_chi2 < alpha else "Hypothesis not rejected"
             )
-            print("_-" * 25)
+    print("-" * 50)
+    print("\n")
