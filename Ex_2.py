@@ -16,9 +16,9 @@ def task2():
             sample = generate_sample(size, lambd)
 
             # Критерій χ²
-            chi2_stat, p_chi2 = chi_square_test(sample, k, lambd)
+            chi2_stat, p_chi2 = chi_square_test(sample, k, 1)
             print(
-                f"Chi-square test (n={size}, k={k}, lambda={lambd}): χ²={chi2_stat:.4f}, p={p_chi2:.4f}"
+                f"Chi-square test (n={size}, k={k}, lambda={lambd}): χ²={chi2_stat:.4f}, p={p_chi2}"
             )
             print(
                 "Hypothesis rejected" if p_chi2 < alpha else "Hypothesis not rejected"
