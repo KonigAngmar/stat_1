@@ -12,8 +12,8 @@ def test_spearman(n, variant='a', alpha=0.05):
     """
     np.random.seed(42)
 
-    xi = np.random.uniform(-1, 1, n)
-    eta = np.random.uniform(-1, 1, n)
+    xi = np.random.uniform(0, 1, n)
+    eta = np.random.uniform(1, 2, n)
     X = xi
 
     if variant == 'a':
@@ -38,8 +38,8 @@ def test_kendall(n, variant='a', alpha=0.05):
     """
     np.random.seed(42)
 
-    xi = np.random.uniform(-1, 1, n)
-    eta = np.random.uniform(-1, 1, n)
+    xi = np.random.uniform(0, 1, n)
+    eta = np.random.uniform(1, 2, n)
     X = xi
 
     if variant == 'a':
