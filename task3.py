@@ -1,29 +1,25 @@
 import numpy as np
-from scipy.stats import norm
+import scipy.stats as stats
 
-def randomness_test(n, alpha=0.05):
-    np.random.seed(42)
-    
-    # Генеруємо вибірку
-    X = np.array([np.mean(np.random.uniform(-1, 1, i)) for i in range(1, n+1)])
-    
-    # Підрахунок кількості інверсій
-    inversions = sum(1 for i in range(n) for j in range(i+1, n) if X[i] > X[j])
-    
-    # Очікуване значення і дисперсія
-    expected = n * (n - 1) / 4
-    variance = n * (n - 1) * (2 * n + 5) / 72
-    
-    # Z-критерій
-    z_stat = (inversions - expected) / np.sqrt(variance)
-    critical_value = norm.ppf(1 - alpha / 2)  # двосторонній критерій
-    
-    # Висновок
-    hypothesis = "Підтверджується" if abs(z_stat) < critical_value else "Відхиляється"
-    
-    return z_stat, critical_value, hypothesis
+def count_inversions(arr):
+    count = 0
+    for i in range(len(arr)):
+        for j in range(i + 1, len(arr)):
+            if arr[i] > arr[j]:
+                count += 1
+    return count
 
-if __name__ == "__main__":
-    for n in [500, 5000, 50000]:
-        z_stat, critical_value, hypothesis = randomness_test(n)
-        print(f"Task 3 | n={n}: Z-Statistic={z_stat:.4f}, Critical Value={critical_value:.4f}, Гіпотеза: {hypothesis}")
+def inversion_test(n, gamma=0.05):
+    X = np.random.uniform(0, 2, n)  # Генеруємо вибірку
+    k = count_inversions(X)
+    
+    z_gamma = stats.norm.ppf(1 - gamma / 2)  # Виправлено обчислення z_gamma
+    threshold = (6 / (n * np.sqrt(n))) * abs(k - (n * (n - 1) / 4))
+    
+    result = "Гіпотеза H0 відхиляється" if threshold > z_gamma else "Гіпотеза H0 прийнята"
+    print(f"n = {n}, k = {k}, threshold = {threshold}, z_gamma = {z_gamma}\n{result}")
+
+# Перевіряємо три випадки
+inversion_test(500)
+inversion_test(5000)
+inversion_test(10000)
